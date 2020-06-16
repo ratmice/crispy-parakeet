@@ -1,0 +1,106 @@
+use crate::lex;
+use rowan::{GreenNodeBuilder, SyntaxKind, SmolStr, Checkpoint};
+
+use lex::TokenWrap;
+
+grammar<'a>(builder: &mut GreenNodeBuilder<'a>);
+
+extern {
+  type Location = usize;
+  type Error = lex::LexicalError;
+
+  enum TokenWrap {
+    "+" => lex::TokenWrap::Token{token: lex::Token::Add, string: <SmolStr>},
+    "-" => lex::TokenWrap::Token{token: lex::Token::Sub, string:<SmolStr>},
+    "*" => lex::TokenWrap::Token{token: lex::Token::Mul, string:<SmolStr>},
+    "/" => lex::TokenWrap::Token{token: lex::Token::Div, string:<SmolStr>},
+    "(" => lex::TokenWrap::Token{token: lex::Token::LParen, string:<SmolStr>},
+    ")" => lex::TokenWrap::Token{token: lex::Token::RParen, string:<SmolStr>},
+    number => lex::TokenWrap::Token{token: lex::Token::Number, string:<SmolStr>},
+    whitespace => lex::TokenWrap::Token{token: lex::Token::Whitespace, string:<SmolStr>},
+  }
+}
+
+pub Expr: (Option<Checkpoint>, Option<(SyntaxKind, SmolStr)>) = {
+  <l:Expr> "-" <r:Factor> => {
+  	eprintln!("finish sub {:?} {:?}", l.clone(), r.clone());
+	let checkpoint = match l.0 {
+		Some(cpt) => cpt,
+		None => match r.0 {
+			Some(cpt) => cpt,
+			None => builder.checkpoint(),
+		}
+	};
+	builder.start_node_at(checkpoint, lex::Token::Operation1.into());
+	l.1.map(|l| builder.token(l.0, l.1));
+	r.1.map(|r| builder.token(r.0, r.1));
+	builder.token(lex::Token::Sub.into(), "-".into());
+	builder.finish_node();
+	(None, None)
+  },
+  <l:Expr> "+" <r:Factor> => {
+  	eprintln!("finish add {:?} {:?}", l, r);
+	let checkpoint = match l.0 {
+		Some(cpt) => cpt,
+		None => match r.0 {
+			Some(cpt) => cpt,
+			None => builder.checkpoint(),
+		}
+	};
+	builder.start_node_at(checkpoint, lex::Token::Operation1.into());
+	l.1.map(|l| builder.token(l.0, l.1));
+	r.1.map(|r| builder.token(r.0, r.1));
+	builder.token(lex::Token::Add.into(), "+".into());
+	builder.finish_node();
+	(None, None)
+  },
+  Factor => {
+  	eprintln!("start factor {:?}", <>);
+//	builder.start_node_at(builder.checkpoint(), lex::Token::Operation2.into())
+	<>
+  },
+};
+
+Factor: (Option<Checkpoint>, Option<(SyntaxKind, SmolStr)>)  = {
+  <l:Factor> "*" <r:Term> => {
+  	eprintln!("finish mul {:?} {:?}", l, r);
+	builder.start_node_at(builder.checkpoint(), lex::Token::Operation1.into());
+	l.1.map(|l| builder.token(l.0, l.1));
+	r.1.map(|r| builder.token(r.0, r.1));
+	builder.token(lex::Token::Mul.into(), "*".into());
+	builder.finish_node();
+	(None, None)
+  },
+
+  <l:Factor> "/" <r:Term> => {
+  	eprintln!("finish div {:?} {:?}", l, r);
+	builder.start_node_at(builder.checkpoint(), lex::Token::Operation1.into());
+	l.1.map(|l| builder.token(l.0, l.1));
+	r.1.map(|r| builder.token(r.0, r.1));
+	builder.token(lex::Token::Div.into(), "/".into());
+	builder.finish_node();
+	(None, None)
+  },
+  Term => {
+  	eprintln!("start term {:?}", <>);
+//	  builder.start_node_at(builder.checkpoint(), lex::Token::Operation3.into())
+	  <>
+  }
+};
+
+Term: (Option<Checkpoint>, Option<(SyntaxKind, SmolStr)>) = {
+  Num => { 
+    println!("start num {:?}", <>);
+    (Some(<>.0), Some((<>.1, <>.2)))
+    // builder.finish_node() 
+  },
+  "(" <e:Expr> ")" => {
+    println!("start expr {:?}", e);
+    e
+ //   builder.start_node_at(builder.checkpoint(), lex::Token::Operation1.into())
+  },
+};
+
+Num: (Checkpoint, SyntaxKind, SmolStr) = {
+  number => (builder.checkpoint(), lex::Token::Number.into(), <>),
+};

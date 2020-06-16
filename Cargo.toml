@@ -1,0 +1,17 @@
+[package]
+name = "calc-rs"
+version = "0.1.0"
+authors = ["matt rice <ratmice@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+logos = "0.11.4"
+#rowan = { git = "https://github.com/simonvandel/rowan.git",  branch = "thread-local-cache"}
+rowan = "0.10.0"
+#sorbus = { git = "https://github.com/cad97/sorbus.git" }
+lalrpop-util = "0.19.0"
+
+[build-dependencies]
+lalrpop = "0.19.0"

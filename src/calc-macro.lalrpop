@@ -1,0 +1,59 @@
+use crate::lex;
+use rowan::{GreenNodeBuilder, SyntaxKind, SmolStr};
+
+use lex::TokenWrap;
+
+grammar<'a>(builder: &mut GreenNodeBuilder<'a>);
+
+extern {
+  type Location = usize;
+  type Error = lex::LexicalError;
+
+  enum TokenWrap {
+    "+" => lex::TokenWrap::Token{token: lex::Token::Add, string: <SmolStr>},
+    "-" => lex::TokenWrap::Token{token: lex::Token::Sub, string:<SmolStr>},
+    "*" => lex::TokenWrap::Token{token: lex::Token::Mul, string:<SmolStr>},
+    "/" => lex::TokenWrap::Token{token: lex::Token::Div, string:<SmolStr>},
+    "(" => lex::TokenWrap::Token{token: lex::Token::LParen, string:<SmolStr>},
+    ")" => lex::TokenWrap::Token{token: lex::Token::RParen, string:<SmolStr>},
+    number => lex::TokenWrap::Token{token: lex::Token::Number, string:<SmolStr>},
+    whitespace => lex::TokenWrap::Token{token: lex::Token::Whitespace, string:<SmolStr>},
+  }
+}
+
+Tier<Op, NextTier>: Option<(SyntaxKind, SmolStr)> = {
+  <t1: Tier<Op,NextTier>> <op:Op> <t2:NextTier> => {
+     builder.start_node_at(builder.checkpoint(), lex::Token::Operation1.into());
+     t1.map(|t| builder.token(t.0, t.1));
+     t2.map(|t| builder.token(t.0, t.1));
+     builder.token(op.0, op.1);
+     builder.finish_node();
+     None
+  },
+  <n:NextTier> => {
+    n
+  },
+}
+
+pub Expr = Tier<ExprOp, Factor>;
+Factor = Tier<FactorOp, Term>;
+
+
+ExprOp: (SyntaxKind, SmolStr) = { 
+  "+" => (lex::Token::Add.into(), <>),
+  "-" => (lex::Token::Sub.into(), <>),
+};
+
+FactorOp: (SyntaxKind, SmolStr) = {
+  "*" => (lex::Token::Mul.into(), <>),
+  "/" => (lex::Token::Div.into(), <>),
+};
+
+Term: Option<(SyntaxKind, SmolStr)> = {
+  <n: Num> => Some(n),
+  "(" <e:Expr> ")" => e,
+};
+
+Num: (SyntaxKind, SmolStr)= {
+  <n:number> => (lex::Token::Number.into(), <>),
+};
