@@ -1,5 +1,6 @@
 use logos::Logos;
-use rowan;
+use sorbus;
+use smol_str::SmolStr;
 use std::ops::Range;
 
 #[derive(Logos, Debug, PartialEq, Clone)]
@@ -25,17 +26,14 @@ pub enum Token {
     #[error]
     Error,
 
-    Operation1,
-    Operation2,
-    Operation3,
-    Uhh,
+    Oper,
     // Parent of all the above.
     Root,
 }
 
 pub type LexicalError = Range<usize>;
 
-impl From<Token> for rowan::SyntaxKind {
+impl From<Token> for sorbus::Kind {
     fn from(kind: Token) -> Self {
         Self(kind as u16)
     }
@@ -45,6 +43,6 @@ impl From<Token> for rowan::SyntaxKind {
 pub enum TokenWrap {
     Token {
         token: Token,
-        string: rowan::SmolStr,
+        string: SmolStr,
     },
 }

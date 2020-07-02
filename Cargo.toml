@@ -9,9 +9,10 @@ edition = "2018"
 [dependencies]
 logos = "0.11.4"
 #rowan = { git = "https://github.com/simonvandel/rowan.git",  branch = "thread-local-cache"}
-rowan = "0.10.0"
-#sorbus = { git = "https://github.com/cad97/sorbus.git" }
+#rowan = "0.10.0"
+sorbus = { git = "https://github.com/cad97/sorbus.git" }
 lalrpop-util = "0.19.0"
+smol_str = "0.1.15"
 
 [build-dependencies]
 lalrpop = "0.19.0"

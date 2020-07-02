@@ -1,9 +1,11 @@
 use crate::lex;
-use rowan::{GreenNodeBuilder, SyntaxKind, SmolStr};
+use sorbus::green::{TreeBuilder, Checkpoint};
+use sorbus::Kind;
+use smol_str::SmolStr;
 
 use lex::TokenWrap;
 
-grammar<'a>(builder: &mut GreenNodeBuilder<'a>);
+grammar(builder: &mut TreeBuilder);
 
 extern {
   type Location = usize;
@@ -21,14 +23,25 @@ extern {
   }
 }
 
-Tier<Op, NextTier>: Option<(SyntaxKind, SmolStr)> = {
+Tier<Op, NextTier>: (Option<Checkpoint>, Option<(Kind, SmolStr)>) = {
   <t1: Tier<Op,NextTier>> <op:Op> <t2:NextTier> => {
-     builder.start_node_at(builder.checkpoint(), lex::Token::Operation1.into());
-     t1.map(|t| builder.token(t.0, t.1));
-     t2.map(|t| builder.token(t.0, t.1));
-     builder.token(op.0, op.1);
+     let checkpoint = match t1.0 {
+     	Some(cpt) => { println!("first checkpoint"); cpt },
+	None => match t2.0 {
+		Some(cpt) => { println!("second checkpoint"); cpt },
+		None => {
+			println!("new checkpoint");
+			builder.checkpoint()
+		}
+	}
+     };
+
+     builder.start_node_at(checkpoint, lex::Token::Oper.into());
+     t1.1.map(|t| builder.token(t.0, &t.1));
+     t2.1.map(|t| builder.token(t.0, &t.1));
+     builder.token(op.0, &op.1);
      builder.finish_node();
-     None
+     (None, None)
   },
   <n:NextTier> => {
     n
@@ -38,22 +51,21 @@ Tier<Op, NextTier>: Option<(SyntaxKind, SmolStr)> = {
 pub Expr = Tier<ExprOp, Factor>;
 Factor = Tier<FactorOp, Term>;
 
-
-ExprOp: (SyntaxKind, SmolStr) = { 
+ExprOp: (Kind, SmolStr) = {
   "+" => (lex::Token::Add.into(), <>),
   "-" => (lex::Token::Sub.into(), <>),
 };
 
-FactorOp: (SyntaxKind, SmolStr) = {
+FactorOp: (Kind, SmolStr) = {
   "*" => (lex::Token::Mul.into(), <>),
   "/" => (lex::Token::Div.into(), <>),
 };
 
-Term: Option<(SyntaxKind, SmolStr)> = {
-  <n: Num> => Some(n),
+Term: (Option<Checkpoint>, Option<(Kind, SmolStr)>) = {
+  Num => (Some(<>.0), Some((<>.1, <>.2))),
   "(" <e:Expr> ")" => e,
 };
 
-Num: (SyntaxKind, SmolStr)= {
-  <n:number> => (lex::Token::Number.into(), <>),
+Num: (Checkpoint, Kind, SmolStr)= {
+  <n:number> => (builder.checkpoint(), lex::Token::Number.into(), <>),
 };

@@ -1,8 +1,9 @@
-use rowan;
+use sorbus;
 mod lex;
 // Bring in the trait.
 use logos::Logos as _;
-use rowan::NodeOrToken;
+use sorbus::NodeOrToken;
+use std::fmt;
 
 mod parser {
     #![allow(clippy::all)]
@@ -22,18 +23,6 @@ mod error {
             MainError::IO(it)
         }
     }
-}
-
-pub mod stuff {
-  use rowan::{SyntaxKind, SmolStr};
-  use std::rc::Rc;
-  pub type Elem = (SyntaxKind, SmolStr);
-
-  #[derive(Debug)]
-  pub enum NumOrExpr {
-    One(Elem),
-    Three(Rc<NumOrExpr>, Rc<NumOrExpr>, Rc<NumOrExpr>),
-  }
 }
 
 struct LexWrap<'a> {
@@ -69,37 +58,49 @@ impl Iterator for LexWrap<'_> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum Lang {}
-type SyntaxNode = rowan::SyntaxNode<Lang>;
+type SyntaxNode = sorbus::green::Node;
 #[allow(unused)]
-type SyntaxToken = rowan::SyntaxToken<Lang>;
+type SyntaxToken = sorbus::green::Token;
 #[allow(unused)]
-type SyntaxElement = rowan::NodeOrToken<SyntaxNode, SyntaxToken>;
+type SyntaxElement = sorbus::NodeOrToken<SyntaxNode, SyntaxToken>;
 
-impl rowan::Language for Lang {
-    type Kind = lex::Token;
-    fn kind_from_raw(raw: rowan::SyntaxKind) -> Self::Kind {
-        assert!(raw.0 <= lex::Token::Root as u16);
-        unsafe { std::mem::transmute::<u16, lex::Token>(raw.0) }
-    }
-    fn kind_to_raw(kind: Self::Kind) -> rowan::SyntaxKind {
-        kind.into()
-    }
+// From Rowan but not implemented in sorbus.
+pub trait Language: Sized + Clone + Copy + fmt::Debug + Eq + Ord + std::hash::Hash {
+    type Kind: fmt::Debug;
+
+    fn kind_from_raw(raw: sorbus::Kind) -> Self::Kind;
+    fn kind_to_raw(kind: Self::Kind) -> sorbus::Kind;
 }
 
-fn print(indent: usize, element: SyntaxElement) {
-    let kind: lex::Token = element.kind().into();
-    print!("{:indent$}", "", indent = indent);
-    match element {
-        NodeOrToken::Node(node) => {
-            println!("- {:?}", kind);
-            for child in node.children_with_tokens() {
-                print(indent + 2, child);
+// Shamelessly stolen/slightly modified from the sorbus pratt example.
+fn to_sexpr(node: &SyntaxNode) -> String {
+    fn display<'a>(
+        el: NodeOrToken<&'a SyntaxNode, &'a SyntaxToken>,
+        f: &'a mut dyn fmt::Write,
+    ) -> fmt::Result {
+        match el {
+            NodeOrToken::Token(token) => write!(f, "{}", token.text())?,
+            NodeOrToken::Node(node) => {
+                let children_of_interest: Vec<_> =
+                    node.children().filter(|el| el.kind() != lex::Token::Whitespace.into()).collect();
+                if children_of_interest.len() == 1 {
+                    display(children_of_interest[0].as_deref(), f)?;
+                } else {
+                    f.write_str("(")?;
+                    for op in children_of_interest.iter() {
+                        display(op.as_deref(), f)?;
+                    }
+                    f.write_str(")")?;
+                }
             }
         }
-
-        NodeOrToken::Token(token) => println!("- {:?} {:?}", token.text(), kind),
+        Ok(())
     }
+    let mut s = String::new();
+    display(NodeOrToken::Node(node), &mut s).unwrap();
+    s
 }
+
 
 fn main() -> Result<(), error::MainError> {
     let s = "1 + 2 * 3 - 4";
@@ -107,12 +108,13 @@ fn main() -> Result<(), error::MainError> {
         lexer: lex::Token::lexer(s),
     };
 
-    let mut builder = rowan::GreenNodeBuilder::new();
+    let mut builder = sorbus::green::TreeBuilder::new();
     builder.start_node(lex::Token::Root.into());
     let foo = parser::ExprParser::new().parse(&mut builder, lexer);
     println!("{:?}", foo.unwrap());
     builder.finish_node();
-    let ast = SyntaxNode::new_root(builder.finish());
-    print(0, ast.into());
+    let ast = builder.finish();
+    println!("{}", to_sexpr(&ast));
+    println!("{:#?}", ast);
     Ok(())
 }
