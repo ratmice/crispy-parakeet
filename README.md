@@ -34,7 +34,6 @@ The resulting tree ends up something like a reverse polish notation.
     - "4" Number
     - "-" Sub
 ```
-
 ## TODO ...
 
 Needs to test out a branch based on the rowan pr #63
