@@ -3,7 +3,7 @@ use rowan::{GreenNodeBuilder, SyntaxKind, SmolStr};
 
 use lex::TokenWrap;
 
-grammar<'a>(builder: &mut GreenNodeBuilder<'a>);
+grammar(builder: &mut GreenNodeBuilder);
 
 extern {
   type Location = usize;
